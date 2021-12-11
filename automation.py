@@ -4,6 +4,20 @@ import copy
 import re
 from collections import defaultdict
 
+resource_allocation_expressions = {
+    "si_grant": r'(grant[\s\w]+).+(coreSet=\d+).+(startSymb=\d+).+(nbSymb=\d).+'
+                r'(searchSpace=[\w\s\d-]+).+(rnti=.+)',
+
+    "dl_ul_grant": r'(.+grant\s[01-]{3}).+(nbPrb=\d+).+(startCce=\d+).+(AL=\d+).+'
+                   r'(coreSet=\d+).+(startPDCCHSymbol=\d+).+(nbPDCCHSymbol=\d+).+'
+                   r'(searchSpace=[\w\s\d-]+).+(rnti=.+)',
+
+    "msg3_grant": r'(grant\srach\sMsg3).+(coreSet=\d+).+(startSymb=\d+).+'
+                  r'(nbSymb=\d+).+(searchSpace=[\w\s\d-]+)',
+
+    "pdsch_allocation": r'.+(startPrb=\d+).+(startPDSCHSymbol=\d+).+(nbPDSCHSymbols=\d+).+'
+}
+
 
 class Parser(object):
     @staticmethod
@@ -59,46 +73,26 @@ class Parser(object):
         for message in component_messages:
             content_indicator = message.split(',')[0]
             if content_indicator == "grant for SI rnti":
-                filtered_messages.append(Parser.filter_si_grant_allocation_content(message))
+                filtered_messages.append(Parser.filter_message_allocation_content(
+                    message=message, filter_expression=resource_allocation_expressions["si_grant"])
+                )
             elif content_indicator in ["DL grant 1-1", "UL grant 0-1"]:
-                filtered_messages.append(Parser.filter_dl_ul_grant_allocation_content(message))
+                filtered_messages.append(Parser.filter_message_allocation_content(
+                    message=message, filter_expression=resource_allocation_expressions["dl_ul_grant"]
+                ))
             elif "codeBooki" in content_indicator:
-                filtered_messages.append(Parser.filter_pdsch_allocation_content(message))
+                filtered_messages.append(Parser.filter_message_allocation_content(
+                    message=message, filter_expression=resource_allocation_expressions["pdsch_allocation"]
+                ))
             elif "grant rach Msg3" in content_indicator:
-                # print(message)
-                filtered_messages.append(Parser.filter_msg3_grant_allocation_content(message))
+                filtered_messages.append(Parser.filter_message_allocation_content(
+                    message=message, filter_expression=resource_allocation_expressions["msg3_grant"]
+                ))
         return filtered_messages
 
     @staticmethod
-    def filter_dl_ul_grant_allocation_content(message: str) -> str:
-        pattern = re.compile(
-            r'(.+grant\s[01-]{3}).+(nbPrb=\d+).+(startCce=\d+).+(AL=\d+).+'
-            r'(coreSet=\d+).+(startPDCCHSymbol=\d+).+(nbPDCCHSymbol=\d+).+'
-            r'(searchSpace=[\w\s\d-]+).+(rnti=.+)'
-        )
-        return ",".join(pattern.findall(message)[0])
-
-    @staticmethod
-    def filter_si_grant_allocation_content(message: str) -> str:
-        pattern = re.compile(
-            r'(grant[\s\w]+).+(coreSet=\d+).+(startSymb=\d+).+(nbSymb=\d).+'
-            r'(searchSpace=[\w\s\d-]+).+(rnti=.+)'
-        )
-        return ",".join(pattern.findall(message)[0])
-
-    @staticmethod
-    def filter_msg3_grant_allocation_content(message: str) -> str:
-        pattern = re.compile(
-            r'(grant\srach\sMsg3).+(coreSet=\d+).+(startSymb=\d+).+'
-            r'(nbSymb=\d+).+(searchSpace=[\w\s\d-]+)'
-        )
-        return ",".join(pattern.findall(message)[0])
-
-    @staticmethod
-    def filter_pdsch_allocation_content(message: str) -> str:
-        pattern = re.compile(
-            r'.+(startPrb=\d+).+(startPDSCHSymbol=\d+).+(nbPDSCHSymbols=\d+).+'
-        )
+    def filter_message_allocation_content(message: str, filter_expression: str) -> str:
+        pattern = re.compile(filter_expression)
         return ",".join(pattern.findall(message)[0])
 
     @staticmethod
@@ -107,7 +101,6 @@ class Parser(object):
 
 
 class Verifier(object):
-
     @staticmethod
     def get_traces_with_specific_content(traces: dict, to_keep: str) -> dict:
         traces_with_content = {}
