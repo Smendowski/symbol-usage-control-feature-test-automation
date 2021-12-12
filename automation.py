@@ -4,18 +4,18 @@ import copy
 import re
 from collections import defaultdict
 
-resource_allocation_expressions = {
-    "si_grant": r'(grant[\s\w]+).+(coreSet=\d+).+(startSymb=\d+).+(nbSymb=\d).+'
-                r'(searchSpace=[\w\s\d-]+).+(rnti=.+)',
+allocation_expressions = {
+    "SI": r'(grant[\s\w]+).+(coreSet=\d+).+(startSymb=\d+).+(nbSymb=\d).+'
+          r'(searchSpace=[\w\s\d-]+).+(rnti=.+)',
 
-    "dl_ul_grant": r'(.+grant\s[01-]{3}).+(nbPrb=\d+).+(startCce=\d+).+(AL=\d+).+'
-                   r'(coreSet=\d+).+(startPDCCHSymbol=\d+).+(nbPDCCHSymbol=\d+).+'
-                   r'(searchSpace=[\w\s\d-]+).+(rnti=.+)',
+    "DL_UL": r'(.+grant\s[01-]{3}).+(nbPrb=\d+).+(startCce=\d+).+(AL=\d+).+'
+             r'(coreSet=\d+).+(startPDCCHSymbol=\d+).+(nbPDCCHSymbol=\d+).+'
+             r'(searchSpace=[\w\s\d-]+).+(rnti=.+)',
 
-    "msg3_grant": r'(grant\srach\sMsg3).+(coreSet=\d+).+(startSymb=\d+).+'
-                  r'(nbSymb=\d+).+(searchSpace=[\w\s\d-]+)',
+    "MSG3": r'(grant\srach\sMsg3).+(coreSet=\d+).+(startSymb=\d+).+'
+            r'(nbSymb=\d+).+(searchSpace=[\w\s\d-]+)',
 
-    "pdsch_allocation": r'.+(startPrb=\d+).+(startPDSCHSymbol=\d+).+(nbPDSCHSymbols=\d+).+'
+    "PDSCH": r'.+(startPrb=\d+).+(startPDSCHSymbol=\d+).+(nbPDSCHSymbols=\d+).+'
 }
 
 
@@ -57,10 +57,10 @@ class Parser(object):
         return send_request_traces
 
     @staticmethod
-    def extract_content_from_dl_send_request_messages(l1l2traces: dict) -> dict:
-        filtered_traces = copy.deepcopy(l1l2traces)
+    def extract_dl_send_request_messages(l1l2_traces: dict) -> dict:
+        filtered_traces = copy.deepcopy(l1l2_traces)
 
-        for tti, data in l1l2traces.items():
+        for tti, data in l1l2_traces.items():
             for message_id, component_messages in data.items():
                 filtered_traces[tti][message_id] = Parser.filter_dl_send_request_messages(component_messages)
 
@@ -73,26 +73,34 @@ class Parser(object):
         for message in component_messages:
             content_indicator = message.split(',')[0]
             if content_indicator == "grant for SI rnti":
-                filtered_messages.append(Parser.filter_message_allocation_content(
-                    message=message, filter_expression=resource_allocation_expressions["si_grant"])
+                filtered_messages.append(
+                    Parser.filter_allocation_content(
+                        message, allocation_expressions["SI"]
+                    )
                 )
             elif content_indicator in ["DL grant 1-1", "UL grant 0-1"]:
-                filtered_messages.append(Parser.filter_message_allocation_content(
-                    message=message, filter_expression=resource_allocation_expressions["dl_ul_grant"]
-                ))
+                filtered_messages.append(
+                    Parser.filter_allocation_content(
+                        message, allocation_expressions["DL_UL"]
+                    )
+                )
             elif "codeBooki" in content_indicator:
-                filtered_messages.append(Parser.filter_message_allocation_content(
-                    message=message, filter_expression=resource_allocation_expressions["pdsch_allocation"]
-                ))
+                filtered_messages.append(
+                    Parser.filter_allocation_content(g
+                        message, allocation_expressions["PDSCH"]
+                    )
+                )
             elif "grant rach Msg3" in content_indicator:
-                filtered_messages.append(Parser.filter_message_allocation_content(
-                    message=message, filter_expression=resource_allocation_expressions["msg3_grant"]
-                ))
+                filtered_messages.append(
+                    Parser.filter_allocation_content(
+                        message, allocation_expressions["MSG3"]
+                    )
+                )
         return filtered_messages
 
     @staticmethod
-    def filter_message_allocation_content(message: str, filter_expression: str) -> str:
-        pattern = re.compile(filter_expression)
+    def filter_allocation_content(message: str, expression: str) -> str:
+        pattern = re.compile(expression)
         return ",".join(pattern.findall(message)[0])
 
     @staticmethod
