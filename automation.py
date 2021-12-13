@@ -2,6 +2,7 @@ import csv
 import json
 import copy
 import re
+from typing import Tuple
 from collections import defaultdict
 
 allocation_expressions = {
@@ -119,7 +120,7 @@ class Verifier(object):
         return traces_with_content
 
     @staticmethod
-    def get_traces_without_specific_content(traces: dict, to_skip: str):
+    def get_traces_without_specific_content(traces: dict, to_skip: str) -> dict:
         traces_without_content = copy.deepcopy(traces)
         for tti, data in traces.items():
             for _, message_content in data.items():
@@ -128,7 +129,7 @@ class Verifier(object):
         return traces_without_content
 
     @staticmethod
-    def get_traces_with_dl_grant_and_without_common_channel(traces: dict):
+    def get_traces_with_dl_grant_and_without_common_channel(traces: dict) -> dict:
         return Verifier.get_traces_with_specific_content(
             Verifier.get_traces_without_specific_content(
                 traces, to_skip="grant for SI rnti"
@@ -137,7 +138,7 @@ class Verifier(object):
         )
 
     @staticmethod
-    def get_traces_with_dl_grant_and_with_common_channel(traces: dict):
+    def get_traces_with_dl_grant_and_with_common_channel(traces: dict) -> dict:
         return Verifier.get_traces_with_specific_content(
             Verifier.get_traces_with_specific_content(
                 traces, to_keep="grant for SI rnti"
@@ -146,45 +147,63 @@ class Verifier(object):
         )
 
     @staticmethod
-    def get_matched_pattern_content(content: str, reg_exp: str):
+    def get_content_matches_pattern(content: str, reg_exp: str):
         pattern = re.compile(reg_exp)
         return pattern.findall(content)
 
     @staticmethod
-    def verify_pdcch_size_without_common_channels(traces, expected_pdcch_size):
+    def get_time_domain_information_from_tti(tti_data: dict) -> Tuple[list, list, list]:
+
+        start_pdcch_symbols = []
+        nb_pdcch_symbols = []
+        start_pdsch_symbols = []
+
+        for message_id, message_content in tti_data.items():
+            message_content_merged = ",".join(message_content)
+
+            if message_id in ['Dl PdcchSendReq(29)', 'Dl PdcchSendReq(31)']:
+                for match in Verifier.get_content_matches_pattern(
+                        message_content_merged, r'startPDCCHSymbol=(\d)'):
+                    start_pdcch_symbols.append(match)
+
+                for match in Verifier.get_content_matches_pattern(
+                        message_content_merged, r'nbPDCCHSymbol=(\d)'):
+                    nb_pdcch_symbols.append(match)
+
+            elif message_id == "Dl PdschSendReq(30)":
+                for match in Verifier.get_content_matches_pattern(
+                        message_content_merged, r'startPDSCHSymbol=(\d)'):
+                    start_pdsch_symbols.append(match)
+        return (
+            start_pdcch_symbols, nb_pdcch_symbols, start_pdsch_symbols
+        )
+
+    @staticmethod
+    def verify_pdcch_size_without_common_channels(traces: dict, expected_pdcch_size: int) -> bool:
         traces_to_verify = Verifier.get_traces_with_dl_grant_and_without_common_channel(traces)
-        traces_with_expected_pdcch_size = []
+        tti_with_expected_pdcch_size = []
 
         for tti, data in traces_to_verify.items():
-            start_pdcch_symbols = []
-            nb_pdcch_symbols = []
-            start_pdsch_symbols = []
-
-            for message_id, message_content in data.items():
-                message_content_merged = ",".join(message_content)
-
-                if message_id in ["Dl PdcchSendReq(29)", "Dl PdcchSendReq(31)"]:
-                    for match in Verifier.get_matched_pattern_content(message_content_merged, r'startPDCCHSymbol=(\d)'):
-                        start_pdcch_symbols.append(match)
-                    for match in Verifier.get_matched_pattern_content(message_content_merged, r'nbPDCCHSymbol=(\d)'):
-                        nb_pdcch_symbols.append(match)
-                elif message_id == "Dl PdschSendReq(30)":
-                    for match in Verifier.get_matched_pattern_content(message_content_merged, r'startPDSCHSymbol=(\d)'):
-                        start_pdsch_symbols.append(match)
+            start_pdcch_symbols, nb_pdcch_symbols, start_pdsch_symbols = \
+                Verifier.get_time_domain_information_from_tti(data)
 
             if not start_pdsch_symbols:
                 continue
 
+            pdcch_allocation_pairs = list(set(
+                ["".join([start_pdcch_symbols[i], nb_pdcch_symbols[i]])
+                 for i in range(len(start_pdcch_symbols))]
+            ))
+
             symbol_usage = []
-            pdcch_allocation_pairs = list(set(["".join([start_pdcch_symbols[i], nb_pdcch_symbols[i]])
-                                               for i in range(len(start_pdcch_symbols))]))
             for pair in pdcch_allocation_pairs:
                 start_pdcch_symbol, allocated_symbols = pair
                 symbol_usage.append(int(start_pdcch_symbol))
                 symbol_usage.append(int(start_pdcch_symbol) + int(allocated_symbols))
 
-            final_pdcch_size = list(set(symbol_usage))[-1]
-            if final_pdcch_size == int(sorted(start_pdsch_symbols)[0]) and final_pdcch_size == expected_pdcch_size:
-                traces_with_expected_pdcch_size.append(tti)
+            pdcch_size = list(set(symbol_usage))[-1]
 
-        return len(traces_with_expected_pdcch_size) > 0
+            if pdcch_size == int(sorted(start_pdsch_symbols)[0]) and pdcch_size == expected_pdcch_size:
+                tti_with_expected_pdcch_size.append(tti)
+
+        return len(tti_with_expected_pdcch_size) > 0
