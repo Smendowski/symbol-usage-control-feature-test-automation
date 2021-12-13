@@ -86,7 +86,7 @@ class Parser(object):
                 )
             elif "codeBooki" in content_indicator:
                 filtered_messages.append(
-                    Parser.filter_allocation_content(g
+                    Parser.filter_allocation_content(
                         message, allocation_expressions["PDSCH"]
                     )
                 )

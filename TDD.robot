@@ -2,11 +2,11 @@
 Resource    keywords.robot
 
 Suite Setup    Run Keywords
-...            Wait untill Base Station Status is Ready
+...            Wait until Base Station Status is Ready
 ...            Prepare Core Network Configuration File for multiple SA UEs
 ...            Start Core Network Application and Load Configuration File
-...            Wait untill Cell Status is Online
-...            Wait untill NG Link Status is Ready
+...            Wait until Cell Status is Online
+...            Wait until NG Link Status is Ready
 ...            Verify Cell Setup and System Information Blocks
 ...            Setup L1L2 Packets Capturing
 

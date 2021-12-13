@@ -1,5 +1,5 @@
 *** Keywords ***
-Wait untill Base Station Status is Ready
+Wait until Base Station Status is Ready
     [Documentation]    Waiting Untill Base Station Status Is Ready
     sleep    10s
     # INTERNAL IMPLEMENTATION
@@ -14,13 +14,13 @@ Start Core Network Application and Load Configuration File
     sleep    10s
     # INTERNAL IMPLEMENTATION
 
-Wait untill Cell Status is Online
-    [Documentation]    Wait untill Cell Status is Online
+Wait until Cell Status is Online
+    [Documentation]    Wait until Cell Status is Online
     sleep    10s
     # INTERNAL IMPLEMENTATION
 
-Wait untill NG Link Status is Ready
-    [Documentation]    Wait untill NG Link Status is Ready
+Wait until NG Link Status is Ready
+    [Documentation]    Wait until NG Link Status is Ready
     sleep    10s
     # INTERNAL IMPLEMENTATION
 
